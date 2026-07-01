@@ -1,0 +1,8 @@
+{
+  "appId": "com.fundmonitor.app",
+  "appName": "基金监控",
+  "webDir": "www",
+  "server": {
+    "cleartext": true
+  }
+}
