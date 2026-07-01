@@ -1,0 +1,111 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>馃搳 鍩洪噾鐩戞帶</title>
+  <link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"></head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <div class="header-left">
+        <h1>馃搳 鍩洪噾鐩戞帶</h1>
+        <span id="lastUpdateLabel" class="last-update" title="涓婃鏇存柊鏃堕棿">--:--:--</span>
+      </div>
+      <div class="header-actions">
+        <span id="refreshTimer" class="refresh-timer">--s</span>
+        <button id="btnRefresh" class="btn-icon" title="鎵嬪姩鍒锋柊 (Ctrl+R)">鈫?/button>
+        <button id="btnAddFund" class="btn-add">+ 娣诲姞鍩洪噾</button>
+      </div>
+    </header>
+
+    <!-- Market Overview -->
+    <section id="marketOverview" class="card market-card">
+      <div class="market-title">馃搱 澶х洏鎸囨暟 <span class="market-badge">瀹炴椂</span></div>
+      <div id="marketIndices" class="market-indices">
+        <div class="loading">鍔犺浇涓?..</div>
+      </div>
+    </section>
+
+    <!-- Fund List -->
+    <section id="fundList" class="fund-list">
+      <div class="list-header">
+        <h2>馃搵 鑷€夊熀閲?/h2>
+        <span class="fund-count" id="fundCount">0 鍙?/span>
+      </div>
+      <div id="fundCards" class="fund-cards">
+        <div class="empty-state">馃摥 鏆傛棤鍩洪噾锛岀偣鍑诲彸涓婅銆?strong>+ 娣诲姞鍩洪噾</strong>銆嶅紑濮嬬洃鎺?br><span class="empty-hint">鎻愮ず锛氬ぇ鐩樻寚鏁板疄鏃舵樉绀轰腑锛屾坊鍔犲熀閲戝悗鍗冲彲鏌ョ湅鎸佷粨瀹炴椂鏀剁泭</span></div>
+      </div>
+    </section>
+
+    <!-- Summary Bar -->
+    <section id="summaryBar" class="card summary-card" style="display:none">
+      <div class="summary-row">
+        <div class="summary-item">
+          <span class="summary-label">馃挵 鎸佷粨鎴愭湰</span>
+          <span id="totalCost" class="value">楼0.00</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">馃搳 褰撳墠甯傚€?/span>
+          <span id="totalValue" class="value">楼0.00</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">馃搱 鎬绘敹鐩?/span>
+          <span id="totalProfit" class="value">楼0.00</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">馃搳 鏀剁泭鐜?/span>
+          <span id="totalProfitRate" class="value">0.00%</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Modal Overlay -->
+    <div id="modalOverlay" class="modal-overlay" style="display:none">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3 id="modalTitle">+ 娣诲姞鍩洪噾</h3>
+          <button class="btn-close" onclick="closeModal()">鉁?/button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>馃敘 鍩洪噾浠ｇ爜</label>
+            <div class="input-with-action">
+              <input type="text" id="inputCode" placeholder="濡? 000001" maxlength="6" oninput="onCodeInput()" autocomplete="off">
+              <button id="btnFetchName" class="btn-sm" onclick="fetchFundName()" disabled>鏌ヨ</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>馃摏 鍩洪噾鍚嶇О</label>
+            <input type="text" id="inputName" placeholder="杈撳叆浠ｇ爜鐐瑰嚮鏌ヨ鑷姩鑾峰彇" readonly>
+          </div>
+          <div class="form-row">
+            <div class="form-group half">
+              <label>馃摝 鎸佹湁浠介</label>
+              <input type="number" id="inputShares" placeholder="濡? 1000" step="0.01">
+            </div>
+            <div class="form-group half">
+              <label>馃挷 鎴愭湰鍗曚环 (鍏?浠?</label>
+              <input type="number" id="inputCost" placeholder="濡? 1.5000" step="0.0001">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>馃摑 澶囨敞 (閫夊～)</label>
+            <input type="text" id="inputNote" placeholder="濡? 鏀粯瀹?/ 澶╁ぉ鍩洪噾">
+          </div>
+          <div id="fetchStatus" class="fetch-status"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-cancel" onclick="closeModal()">鍙栨秷</button>
+          <button class="btn-primary" onclick="confirmAddFund()" id="btnConfirmAdd">鉁?纭娣诲姞</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer-browser.js"></script>
+</body>
+</html>
+
