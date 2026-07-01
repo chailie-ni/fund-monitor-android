@@ -1,0 +1,20 @@
+{
+  "name": "fund-monitor-android",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:apk": "cd android && .\\gradlew.bat assembleDebug",
+    "build:apk:release": "cd android && .\\gradlew.bat assembleRelease",
+    "cap:init": "npx cap init 基金监控 com.fundmonitor.app --web-dir www",
+    "cap:add:android": "npx cap add android",
+    "cap:sync": "npx cap sync",
+    "cap:copy": "npx cap copy android",
+    "cap:open": "npx cap open android",
+    "build:all": "npm run cap:sync && npm run build:apk"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1"
+  }
+}
