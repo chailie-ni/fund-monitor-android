@@ -1,0 +1,110 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 基金监控</title>
+  <link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"></head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <div class="header-left">
+        <h1>📊 基金监控</h1>
+        <span id="lastUpdateLabel" class="last-update" title="上次更新时间">--:--:--</span>
+      </div>
+      <div class="header-actions">
+        <span id="refreshTimer" class="refresh-timer">--s</span>
+        <button id="btnRefresh" class="btn-icon" title="手动刷新 (Ctrl+R)">↻</button>
+        <button id="btnAddFund" class="btn-add">+ 添加基金</button>
+      </div>
+    </header>
+
+    <!-- Market Overview -->
+    <section id="marketOverview" class="card market-card">
+      <div class="market-title">📈 大盘指数 <span class="market-badge">实时</span></div>
+      <div id="marketIndices" class="market-indices">
+        <div class="loading">加载中...</div>
+      </div>
+    </section>
+
+    <!-- Fund List -->
+    <section id="fundList" class="fund-list">
+      <div class="list-header">
+        <h2>📋 自选基金</h2>
+        <span class="fund-count" id="fundCount">0 只</span>
+      </div>
+      <div id="fundCards" class="fund-cards">
+        <div class="empty-state">📭 暂无基金，点击右上角「<strong>+ 添加基金</strong>」开始监控<br><span class="empty-hint">提示：大盘指数实时显示中，添加基金后即可查看持仓实时收益</span></div>
+      </div>
+    </section>
+
+    <!-- Summary Bar -->
+    <section id="summaryBar" class="card summary-card" style="display:none">
+      <div class="summary-row">
+        <div class="summary-item">
+          <span class="summary-label">💰 持仓成本</span>
+          <span id="totalCost" class="value">¥0.00</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">📊 当前市值</span>
+          <span id="totalValue" class="value">¥0.00</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">📈 总收益</span>
+          <span id="totalProfit" class="value">¥0.00</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">📊 收益率</span>
+          <span id="totalProfitRate" class="value">0.00%</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Modal Overlay -->
+     <div id="modalOverlay" class="modal-overlay" style="display:none">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3 id="modalTitle">+ 添加基金</h3>
+          <button class="btn-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>🔢 基金代码</label>
+            <div class="input-with-action">
+              <input type="text" id="inputCode" placeholder="如: 000001" maxlength="6" oninput="onCodeInput()" autocomplete="off">
+              <button id="btnFetchName" class="btn-sm" onclick="fetchFundName()" disabled>查询</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>📛 基金名称</label>
+            <input type="text" id="inputName" placeholder="输入代码点击查询自动获取" readonly>
+          </div>
+          <div class="form-row">
+            <div class="form-group half">
+              <label>📦 持有份额</label>
+              <input type="number" id="inputShares" placeholder="如: 1000" step="0.01">
+            </div>
+            <div class="form-group half">
+              <label>💲 成本单价 (元/份)</label>
+              <input type="number" id="inputCost" placeholder="如: 1.5000" step="0.0001">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>📝 备注 (选填)</label>
+            <input type="text" id="inputNote" placeholder="如: 支付宝 / 天天基金">
+          </div>
+          <div id="fetchStatus" class="fetch-status"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-cancel" onclick="closeModal()">取消</button>
+          <button class="btn-primary" onclick="confirmAddFund()" id="btnConfirmAdd">✅ 确认添加</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer-browser.js"></script>
+</body>
+</html>
