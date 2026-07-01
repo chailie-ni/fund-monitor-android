@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">基金监控</string>
+    <string name="title_activity_main">基金监控</string>
+    <string name="package_name">com.fundmonitor.app</string>
+    <string name="custom_url_scheme">com.fundmonitor.app</string>
+</resources>
