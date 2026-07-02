@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">eastmoney.com</domain>
+        <domain includeSubdomains="true">1234567.com.cn</domain>
+        <domain includeSubdomains="true">qq.com</domain>
+        <domain includeSubdomains="true">sina.com.cn</domain>
+        <domain includeSubdomains="true">tencent.com</domain>
+        <domain includeSubdomains="true">fundgz.1234567.com.cn</domain>
+        <domain includeSubdomains="true">push2.eastmoney.com</domain>
+        <domain includeSubdomains="true">fund.eastmoney.com</domain>
+    </domain-config>
+</network-security-config>
