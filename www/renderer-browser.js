@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿// ==============================
+=======
+// ==============================
+>>>>>>> 35976c2 (﻿fix: BOM清理 + 网络安全配置 + 乱码修复)
 // 基金监控 - Android版 (API直连)
 // ==============================
 
@@ -354,4 +358,8 @@ function setupEvents() {
 
 function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+<<<<<<< HEAD
 document.addEventListener('DOMContentLoaded', init);
+=======
+document.addEventListener('DOMContentLoaded', init);
+>>>>>>> 35976c2 (﻿fix: BOM清理 + 网络安全配置 + 乱码修复)
