@@ -37,4 +37,8 @@ if %errorlevel% equ 0 (
     echo.
 )
 
+<<<<<<< HEAD
 pause
+=======
+pause
+>>>>>>> 35976c2 (﻿fix: BOM清理 + 网络安全配置 + 乱码修复)
