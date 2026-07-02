@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿# 基金监控 - Android APK
+=======
+# 基金监控 - Android APK
+>>>>>>> 35976c2 (﻿fix: BOM清理 + 网络安全配置 + 乱码修复)
 
 ## 本地构建（需要 JDK 17）
 
@@ -60,4 +64,8 @@ android-build/
 ├── capacitor.config.json   # Capacitor 配置
 ├── package.json            # 依赖
 ├── build.bat               # 本地构建脚本
+<<<<<<< HEAD
 └── .github/workflows/      # GitHub Actions 自动化构建
+=======
+└── .github/workflows/      # GitHub Actions 自动化构建
+>>>>>>> 35976c2 (﻿fix: BOM清理 + 网络安全配置 + 乱码修复)
