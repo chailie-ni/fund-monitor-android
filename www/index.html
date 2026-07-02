@@ -16,7 +16,7 @@
                 <h1 class="title">基金监控</h1>
                 <span id="refresh-timer"></span>
             </div>
-            <button id="add-btn" class="btn" onclick="showAddPanel()">+ 添加基金</button>
+            <button id="add-btn" class="btn" onclick="FundMonitor.showAddPanel()">+ 添加基金</button>
         </div>
         <div id="indices-section">
             <h2>大盘指数</h2>
@@ -29,17 +29,20 @@
         <div id="add-panel" class="panel hidden">
             <h3>添加基金</h3>
             <div class="search-box">
-                <input type="text" id="search-input" placeholder="输入基金名称或代码搜索..." oninput="searchFund()">
+                <input type="text" id="search-input" placeholder="输入基金名称或代码搜索..." oninput="FundMonitor.searchFund()">
                 <div id="search-results" class="search-results"></div>
             </div>
+            <div style="font-size:12px;color:#666;margin-bottom:10px;padding:0 2px">
+                💡 也可以直接输入6位基金代码，然后填下面的金额
+            </div>
             <div class="input-group">
-                <input type="text" id="fund-code" placeholder="基金代码">
-                <input type="number" id="hold-amount" placeholder="持有金额（元）" step="0.01">
-                <input type="number" id="nav-amount" placeholder="净值/成本价" step="0.0001">
+                <input type="text" id="fund-code" placeholder="基金代码（6位数字）" maxlength="6">
+                <input type="number" id="hold-amount" placeholder="持有金额（元）" step="0.01" min="0">
+                <input type="number" id="nav-amount" placeholder="成本净值（如 1.0000）" step="0.0001" min="0">
             </div>
             <div class="btn-row">
-                <button class="btn primary" onclick="addFund()">确认添加</button>
-                <button class="btn" onclick="hideAddPanel()">取消</button>
+                <button class="btn primary" onclick="FundMonitor.addFund()">确认添加</button>
+                <button class="btn" onclick="FundMonitor.hideAddPanel()">取消</button>
             </div>
         </div>
         <div id="toast" class="toast"></div>
