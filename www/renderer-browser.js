@@ -1,365 +1,191 @@
-<<<<<<< HEAD
-﻿// ==============================
-=======
-// ==============================
->>>>>>> 35976c2 (﻿fix: BOM清理 + 网络安全配置 + 乱码修复)
-// 基金监控 - Android版 (API直连)
-// ==============================
-
-const State = {
-  data: { funds: [], settings: { refreshInterval: 15 } },
-  timer: null, countdown: 0, editingIndex: -1,
-  fundSearchCache: {},
-  prevFundData: {},
-  isRefreshing: false,
-  lastUpdateTime: null,
-  marketOK: false,
-  fundOK: {},
-};
+// 基金监控 - Android WebView版
+const PORTFOLIO_KEY = "fund_portfolio_v2";
+var portfolio = [];
+var indicesData = {};
+var refreshInterval = null;
+var searchTimeout = null;
 
 function init() {
-  loadFromStorage();
-  renderAll();
-  doRefresh();
-  startAutoRefresh();
-  setupEvents();
+    loadPortfolio();
+    loadIndices();
+    startRefresh();
+    renderFunds();
 }
 
-function loadFromStorage() {
-  try {
-    const saved = localStorage.getItem('fund-monitor-data');
-    if (saved) State.data = JSON.parse(saved);
-    if (!State.data.funds) State.data.funds = [];
-    if (!State.data.settings) State.data.settings = { refreshInterval: 15 };
-  } catch (e) {}
-}
-function persist() {
-  try { localStorage.setItem('fund-monitor-data', JSON.stringify(State.data)); } catch (e) {}
+function loadPortfolio() {
+    try {
+        var stored = localStorage.getItem(PORTFOLIO_KEY);
+        if (stored) portfolio = JSON.parse(stored);
+    } catch(e) { portfolio = []; }
 }
 
-function renderAll() {
-  renderFundsInternal();
-  updateSummaryBar();
+function savePortfolio() {
+    localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(portfolio));
 }
 
-// ==============================
-// API 直连 (WebView 无CORS限制)
-// ==============================
-async function apiCall(path) {
-  let url = path;
-  // 本地代理路径 → 直连API
-  if (path.startsWith('/api/market-indices')) {
-    const codes = new URLSearchParams(path.split('?')[1]).get('codes') || '1.000001,0.399001,0.399006,0.000688';
-    url = 'https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f2,f3,f4,f12,f14&secids=' + codes;
-  } else if (path.startsWith('/api/fund-realtime')) {
-    const code = new URLSearchParams(path.split('?')[1]).get('code');
-    url = 'https://fundgz.1234567.com.cn/js/' + code + '.js';
-  } else if (path.startsWith('/api/fund-search')) {
-    url = 'https://fund.eastmoney.com/js/fundcode_search.js';
-  }
-  try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    return await resp.text();
-  } catch (e) {
-    console.warn('API fail:', e.message);
+async function loadIndices() {
+    try {
+        var resp = await fetch("https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f2,f3,f4,f12,f14&secids=1.000001,0.399001,0.399006,0.000688&fltt=2&invt=2&ut=b2884a393a59ad64002292a3e90d46a5");
+        var json = await resp.json();
+        if (json.data && json.data.diff) {
+            indicesData = {};
+            json.data.diff.forEach(function(item) { indicesData[item.f12] = item; });
+            renderIndices();
+        }
+    } catch(e) { console.error("指数加载失败:", e); }
+}
+
+function renderIndices() {
+    var container = document.getElementById("indices-container");
+    if (!container) return;
+    var idxMap = { "000001": "上证指数", "399001": "深证成指", "399006": "创业板指", "000688": "科创50" };
+    container.innerHTML = "";
+    Object.keys(idxMap).forEach(function(code) {
+        var d = indicesData[code];
+        if (!d) return;
+        var dir = d.f3 > 0 ? "up" : d.f3 < 0 ? "down" : "flat";
+        var sign = d.f3 > 0 ? "+" : "";
+        var el = document.createElement("div");
+        el.className = "index-card";
+        el.innerHTML = '<div class="name">' + idxMap[code] + '</div><div class="code">' + code + '</div><div class="value flash-value">' + d.f2 + '</div><div class="change ' + dir + '">' + sign + d.f3 + '% ' + sign + d.f4 + '</div>';
+        container.appendChild(el);
+    });
+}
+
+async function fetchFundGV(code) {
+    try {
+        var resp = await fetch("https://fundgz.1234567.com.cn/js/" + code + ".js?rt=" + Date.now());
+        var text = await resp.text();
+        var match = text.match(/jsonpgz\((\{.*\})\)/);
+        if (match) return JSON.parse(match[1]);
+    } catch(e) {}
     return null;
-  }
 }
 
-async function fetchMarketIndices() {
-  const text = await apiCall('/api/market-indices?codes=1.000001,0.399001,0.399006,0.000688');
-  const container = document.getElementById('marketIndices');
-  if (!text) {
-    container.innerHTML = '<div class="loading err">⚠ 网络异常</div>';
-    State.marketOK = false;
-    return;
-  }
-  try {
-    const json = JSON.parse(text);
-    if (json.data && json.data.diff) {
-      State.marketOK = true;
-      const prevHTML = container.innerHTML;
-      const newHTML = json.data.diff.map(item => {
-        const price = (item.f2 / 100 || 0).toFixed(2);
-        const changePct = (item.f3 || 0).toFixed(2);
-        const cls = changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'flat';
-        const arrow = changePct > 0 ? '▲' : changePct < 0 ? '▼' : '—';
-        return '<div class="index-item ' + cls + '">' +
-          '<div class="index-name">' + (item.f14 || item.f12) + '</div>' +
-          '<div class="index-value">' + price + '</div>' +
-          '<div class="index-change">' + arrow + ' ' + changePct + '%</div></div>';
-      }).join('');
-      container.innerHTML = newHTML;
-      if (prevHTML && prevHTML !== newHTML) container.classList.add('flash');
-      setTimeout(() => container.classList.remove('flash'), 600);
-    } else {
-      container.innerHTML = '<div class="loading">指数数据暂不可用</div>';
+function escHtml(str) {
+    var d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+async function renderFunds() {
+    var container = document.getElementById("funds-container");
+    if (!container || portfolio.length === 0) {
+        if (container) container.innerHTML = '<div style="color:#666;font-size:14px;padding:16px">暂无持仓，点击右上角添加</div>';
+        return;
     }
-  } catch (e) {
-    container.innerHTML = '<div class="loading err">解析失败</div>';
-  }
-}
-
-async function fetchFundRealtime(code) {
-  const text = await apiCall('/api/fund-realtime?code=' + code);
-  if (!text) return null;
-  try {
-    return JSON.parse(text.match(/\\{[\\s\\S]*\\}/)[0]);
-  } catch (e) { return null; }
-}
-
-async function getFundSearchData() {
-  if (Object.keys(State.fundSearchCache).length) return State.fundSearchCache;
-  const text = await apiCall('/api/fund-search');
-  if (!text) return State.fundSearchCache;
-  try {
-    const match = text.match(/var r = (\\[.*?\\]);/);
-    if (match) {
-      JSON.parse(match[1]).forEach(item => { State.fundSearchCache[item[0]] = { name: item[2] }; });
+    var totalGain = 0, totalCost = 0;
+    container.innerHTML = '<div class="funds-grid">';
+    for (var i = 0; i < portfolio.length; i++) {
+        var fund = portfolio[i];
+        var gv = await fetchFundGV(fund.code);
+        if (gv && gv.dwjz) {
+            var currentValue = (fund.holdAmount / fund.navAmount) * parseFloat(gv.dwjz);
+            var gain = currentValue - fund.holdAmount;
+            var gainRate = ((currentValue / fund.holdAmount) - 1) * 100;
+            totalGain += gain; totalCost += fund.holdAmount;
+            var dir = gain >= 0 ? "up" : "down";
+            var sign = gain >= 0 ? "+" : "";
+            var fundName = fund.name || fund.code;
+            var rmCode = fund.code;
+            var card = document.createElement("div");
+            card.className = "fund-card";
+            card.innerHTML = '<div class="fund-header"><div><div class="fund-name">' + escHtml(fundName) + '</div><div class="fund-code">' + rmCode + '</div></div><div class="fund-gvz"><div class="fund-gv flash-value">' + gv.dwjz + '</div><div class="fund-zd ' + dir + '">' + sign + gv.gszzl + '%</div></div></div><div class="fund-details"><div class="detail-item"><span class="detail-label">持有金额</span><span class="detail-value">¥' + fund.holdAmount.toFixed(2) + '</span></div><div class="detail-item"><span class="detail-label">成本价</span><span class="detail-value">' + fund.navAmount + '</span></div><div class="detail-item"><span class="detail-label">当前估值</span><span class="detail-value">¥' + currentValue.toFixed(2) + '</span></div><div class="detail-item"><span class="detail-label">盈亏</span><span class="detail-value ' + dir + '">' + sign + '¥' + gain.toFixed(2) + ' (' + sign + gainRate.toFixed(2) + '%)</span></div></div><div class="fund-actions"><button class="btn danger" onclick="removeFund(\'' + rmCode + '\')">删除</button></div>';
+            container.appendChild(card);
+        } else {
+            var card2 = document.createElement("div");
+            card2.className = "fund-card";
+            card2.innerHTML = '<div class="fund-name">' + escHtml(fund.name || fund.code) + ' (' + fund.code + ')</div><div style="color:#888;margin-top:8px">估值加载失败</div><div class="fund-actions"><button class="btn danger" onclick="removeFund(\'' + fund.code + '\')">删除</button></div>';
+            container.appendChild(card2);
+        }
     }
-  } catch (e) {}
-  return State.fundSearchCache;
-}
-
-async function fetchFundName() {
-  const code = document.getElementById('inputCode').value.trim();
-  const st = document.getElementById('fetchStatus');
-  const ni = document.getElementById('inputName');
-  if (code.length < 6) { st.textContent = '请输入6位基金代码'; return; }
-  const btn = document.getElementById('btnFetchName');
-  btn.disabled = true; st.textContent = '🔍 查询中……';
-  const cache = await getFundSearchData();
-  if (cache[code]) { ni.value = cache[code].name; st.textContent = '✅ 已获取'; btn.disabled = false; return; }
-  const rt = await fetchFundRealtime(code);
-  if (rt && rt.name) { ni.value = rt.name; st.textContent = '✅ 已获取'; }
-  else { st.textContent = '⚠ 未找到，请检查代码'; ni.value = ''; }
-  btn.disabled = false;
-}
-function onCodeInput() {
-  document.getElementById('btnFetchName').disabled = document.getElementById('inputCode').value.trim().length < 6;
-}
-
-function openModal(idx) {
-  document.getElementById('modalOverlay').style.display = 'flex';
-  ['inputCode','inputName','inputShares','inputCost','inputNote'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('fetchStatus').textContent = '';
-  document.getElementById('btnFetchName').disabled = true;
-  if (idx != null) {
-    State.editingIndex = idx;
-    const f = State.data.funds[idx];
-    document.getElementById('modalTitle').textContent = '✎ 编辑基金';
-    document.getElementById('inputCode').value = f.code; document.getElementById('inputCode').readOnly = true;
-    document.getElementById('inputName').value = f.name;
-    document.getElementById('inputShares').value = f.shares;
-    document.getElementById('inputCost').value = f.cost;
-    document.getElementById('inputNote').value = f.note || '';
-  } else {
-    State.editingIndex = -1;
-    document.getElementById('modalTitle').textContent = '＋ 添加基金';
-    document.getElementById('inputCode').readOnly = false;
-  }
-}
-function closeModal() { document.getElementById('modalOverlay').style.display = 'none'; State.editingIndex = -1; }
-
-async function confirmAddFund() {
-  const code = document.getElementById('inputCode').value.trim();
-  const name = document.getElementById('inputName').value.trim();
-  const shares = parseFloat(document.getElementById('inputShares').value);
-  const cost = parseFloat(document.getElementById('inputCost').value);
-  const note = document.getElementById('inputNote').value.trim();
-  if (code.length !== 6) { alert('请输入6位基金代码'); return; }
-  if (!name) { alert('请先查询基金名称'); return; }
-  if (isNaN(shares) || shares <= 0) { alert('请输入有效份额'); return; }
-  if (isNaN(cost) || cost <= 0) { alert('请输入有效成本价'); return; }
-  if (State.editingIndex >= 0) {
-    State.data.funds[State.editingIndex] = { code, name, shares, cost, note };
-  } else {
-    if (State.data.funds.some(f => f.code === code)) { alert('该基金已在自选！'); return; }
-    State.data.funds.push({ code, name, shares, cost, note });
-  }
-  persist(); closeModal(); await doRefresh();
-}
-
-async function deleteFund(idx) {
-  if (!confirm('确认移除「' + State.data.funds[idx].name + '」？')) return;
-  State.data.funds.splice(idx, 1);
-  delete State.prevFundData[State.data.funds[idx]?.code];
-  persist(); await doRefresh();
-}
-
-async function doRefresh() {
-  if (State.isRefreshing) return;
-  State.isRefreshing = true;
-  const rBtn = document.getElementById('btnRefresh');
-  rBtn.classList.add('spinning');
-
-  const [_, fundResults] = await Promise.allSettled([
-    fetchMarketIndices(),
-    Promise.allSettled(State.data.funds.map(f => fetchFundRealtime(f.code)))
-  ]);
-
-  const results = fundResults.status === 'fulfilled' ? fundResults.value : [];
-  let totalCost = 0, totalValue = 0;
-
-  State.data.funds.forEach((fund, i) => {
-    const prev = State.prevFundData[fund.code] || {};
-    const r = results[i]?.status === 'fulfilled' ? results[i].value : null;
-
-    if (r) {
-      fund._estNav = parseFloat(r.gsz);
-      fund._changePct = parseFloat(r.gszzl);
-      fund._navDate = r.jzrq;
-      fund._actualNav = parseFloat(r.dwjz);
-      fund._curValue = fund._estNav * fund.shares;
-      fund._profit = fund._curValue - fund.cost * fund.shares;
-      fund._profitRate = fund.cost > 0 ? (fund._profit / (fund.cost * fund.shares)) * 100 : 0;
-      fund._navChanged = prev.nav !== undefined && prev.nav !== fund._estNav;
-      fund._pctChanged = prev.pct !== undefined && prev.pct !== fund._changePct;
-      State.prevFundData[fund.code] = { nav: fund._estNav, pct: fund._changePct };
-      State.fundOK[fund.code] = true;
-      totalCost += fund.cost * fund.shares;
-      totalValue += fund._curValue;
-    } else {
-      fund._estNav = null; fund._changePct = null; fund._curValue = null;
-      fund._profit = null; fund._profitRate = null; fund._navChanged = false; fund._pctChanged = false;
-      State.fundOK[fund.code] = false;
+    container.innerHTML += '</div>';
+    var totalEl = document.getElementById("total-gain");
+    if (totalEl && totalCost > 0) {
+        var totalDir = totalGain >= 0 ? "up" : "down";
+        var totalSign = totalGain >= 0 ? "+" : "";
+        totalEl.className = "total-gain " + totalDir;
+        totalEl.textContent = totalSign + "¥" + totalGain.toFixed(2) + " (" + totalSign + ((totalGain/totalCost)*100).toFixed(2) + "%)";
     }
-  });
-
-  State.lastUpdateTime = new Date();
-  renderFundsInternal();
-  updateSummaryBar(totalCost, totalValue);
-  updateLastUpdateTime();
-  rBtn.classList.remove('spinning');
-  State.isRefreshing = false;
 }
 
-function renderFundsInternal() {
-  const cards = document.getElementById('fundCards');
-  const funds = State.data.funds;
-  if (funds.length === 0) {
-    cards.innerHTML = '<div class="empty-state">📭 暂无基金，点击右上角「<strong>+ 添加</strong>」开始监控<br><span style="font-size:12px;color:#888;margin-top:6px;display:block">提示：大盘指数实时显示中，添加基金后即可查看持仓收益</span></div>';
-    document.getElementById('fundList').style.display = 'block';
-    return;
-  }
-  cards.innerHTML = funds.map((f, i) => {
-    const ok = f._estNav != null;
-    const cls = ok ? (f._changePct > 0 ? 'up' : f._changePct < 0 ? 'down' : 'flat') : 'flat';
-    const flashNav = f._navChanged ? ' flash-value' : '';
-    const flashPct = f._pctChanged ? ' flash-value' : '';
-
-    if (!ok) {
-      return '<div class="fund-card flat err">' +
-        '<div class="fund-top">' +
-          '<div class="fund-info">' +
-            '<div class="fund-name">' + esc(f.name) + ' <span class="fund-code">' + f.code + '</span></div>' +
-          '</div>' +
-          '<div class="fund-change-area"><div class="fund-change-pct err-txt">⚠ 数据获取失败</div></div>' +
-        '</div>' +
-        '<div class="fund-actions">' + actBtns(i) + '</div></div>';
+function startRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    var seconds = 15;
+    function updateTimer() {
+        var el = document.getElementById("refresh-timer");
+        if (el) el.textContent = seconds + "s后刷新";
     }
-
-    const arrow = f._changePct > 0 ? '▲' : f._changePct < 0 ? '▼' : '—';
-    const sign = f._changePct > 0 ? '+' : '';
-
-    return '<div class="fund-card ' + cls + '" data-code="' + f.code + '">' +
-      '<div class="fund-top">' +
-        '<div class="fund-info">' +
-          '<div class="fund-name">' + esc(f.name) + ' <span class="fund-code">' + f.code + '</span>' +
-          (f.note ? '<span class="fund-note">' + esc(f.note) + '</span>' : '') + '</div>' +
-          '<div class="fund-sub">最新净值：<span class="' + cls + '">¥' + (f._actualNav || 0).toFixed(4) + '</span> · 净值日：' + (f._navDate || '--') + '</div>' +
-        '</div>' +
-        '<div class="fund-change-area">' +
-          '<div class="fund-change-pct ' + cls + flashPct + '">' + arrow + ' ' + sign + f._changePct.toFixed(2) + '%</div>' +
-          '<div class="fund-est-nav ' + cls + flashNav + '">¥' + f._estNav.toFixed(4) + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="fund-detail">' +
-        '<div class="item"><div class="label">持有份额</div><div class="value">' + f.shares.toFixed(2) + '</div></div>' +
-        '<div class="item"><div class="label">成本单价</div><div class="value">¥' + f.cost.toFixed(4) + '</div></div>' +
-        '<div class="item"><div class="label">估算收益</div><div class="value" style="color:' + ((f._profit||0) >= 0 ? 'var(--red)' : 'var(--green)') + '">' + ((f._profit||0) >= 0 ? '+' : '') + '¥' + (f._profit||0).toFixed(2) + '</div></div>' +
-        '<div class="item"><div class="label">收益率</div><div class="value" style="color:' + ((f._profitRate||0) >= 0 ? 'var(--red)' : 'var(--green)') + '">' + ((f._profitRate||0) >= 0 ? '+' : '') + (f._profitRate||0).toFixed(2) + '%</div></div>' +
-      '</div>' +
-      '<div class="fund-actions">' + actBtns(i) + '</div></div>';
-  }).join('');
+    updateTimer();
+    refreshInterval = setInterval(function() {
+        seconds--;
+        if (seconds <= 0) { seconds = 15; loadIndices(); renderFunds(); }
+        updateTimer();
+    }, 1000);
 }
 
-function actBtns(i) {
-  return '<button class="btn-edit" onclick="openModal(' + i + ')" title="编辑">✎</button>' +
-          '<button class="btn-del" onclick="deleteFund(' + i + ')" title="删除">✕</button>';
+function showAddPanel() {
+    document.getElementById("add-panel").classList.remove("hidden");
+    document.getElementById("search-input").value = "";
+    document.getElementById("fund-code").value = "";
+    document.getElementById("hold-amount").value = "";
+    document.getElementById("nav-amount").value = "1.0000";
+    document.getElementById("search-results").innerHTML = "";
 }
 
-function updateLastUpdateTime() {
-  const el = document.getElementById('lastUpdateLabel');
-  if (el && State.lastUpdateTime) {
-    const s = State.lastUpdateTime;
-    el.textContent = s.toTimeString().substring(0, 8);
-    el.classList.add('flash-small');
-    setTimeout(() => el.classList.remove('flash-small'), 400);
-  }
+function hideAddPanel() {
+    document.getElementById("add-panel").classList.add("hidden");
 }
 
-function updateSummaryBar(tc, tv) {
-  const bar = document.getElementById('summaryBar');
-  const funds = State.data.funds;
-  if (funds.length === 0 || tc === undefined) {
-    if (funds.length === 0) { bar.style.display = 'none'; return; }
-    let tc2 = 0, tv2 = 0;
-    funds.forEach(f => { if (f._curValue != null) { tc2 += f.cost * f.shares; tv2 += f._curValue; } });
-    tc = tc2; tv = tv2;
-  }
-  bar.style.display = 'block';
-  const tp = tv - tc;
-  const tpr = tc > 0 ? (tp / tc) * 100 : 0;
-  const c = tp >= 0 ? 'var(--red)' : 'var(--green)';
-  const s = tp >= 0 ? '+' : '';
-  document.getElementById('totalCost').textContent = '¥' + tc.toFixed(2);
-  document.getElementById('totalValue').textContent = '¥' + tv.toFixed(2);
-  const pe = document.getElementById('totalProfit');
-  pe.textContent = s + '¥' + tp.toFixed(2); pe.style.color = c;
-  const re = document.getElementById('totalProfitRate');
-  re.textContent = s + tpr.toFixed(2) + '%'; re.style.color = c;
+async function searchFund() {
+    var q = document.getElementById("search-input").value.trim();
+    var results = document.getElementById("search-results");
+    if (!q) { results.innerHTML = ""; return; }
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async function() {
+        try {
+            var resp = await fetch("https://fund.eastmoney.com/js/fundcode_search.js");
+            var text = await resp.text();
+            var json = JSON.parse(text.replace(/var searchDatas=\[/, "[").replace(/\]$/, "]"));
+            var matches = json.filter(function(f) { return f[0].indexOf(q) !== -1 || f[1].indexOf(q) !== -1; }).slice(0, 10);
+            results.innerHTML = matches.map(function(f) {
+                return '<div class="search-item" onclick="selectFund(\'' + f[0] + '\', \'' + f[1].replace(/'/g, "\\'") + '\')"><div class="fund-name-search">' + escHtml(f[1]) + '</div><div class="fund-code-search">' + f[0] + '</div></div>';
+            }).join("");
+        } catch(e) { results.innerHTML = '<div style="padding:10px;color:#888">搜索失败</div>'; }
+    }, 300);
 }
 
-function startAutoRefresh() {
-  const interval = State.data.settings.refreshInterval || 15;
-  State.countdown = interval;
-  if (State.timer) clearInterval(State.timer);
-  State.timer = setInterval(() => {
-    State.countdown--;
-    if (State.countdown <= 0) { State.countdown = interval; doRefresh(); }
-    updateTimerDisplay();
-  }, 1000);
-}
-function updateTimerDisplay() {
-  const el = document.getElementById('refreshTimer');
-  const total = State.data.settings.refreshInterval || 15;
-  const pct = State.countdown / total;
-  el.textContent = State.countdown + 's';
-  el.style.opacity = 0.4 + 0.6 * pct;
-  el.style.transform = 'scale(' + (0.85 + 0.15 * pct) + ')';
+function selectFund(code, name) {
+    document.getElementById("fund-code").value = code;
+    document.getElementById("search-input").value = name + " (" + code + ")";
+    document.getElementById("search-results").innerHTML = "";
 }
 
-function setupEvents() {
-  document.getElementById('btnRefresh').addEventListener('click', async () => {
-    State.countdown = State.data.settings.refreshInterval || 15;
-    await doRefresh();
-  });
-  document.getElementById('btnAddFund').addEventListener('click', () => openModal());
-  document.getElementById('modalOverlay').addEventListener('click', e => {
-    if (e.target === document.getElementById('modalOverlay')) closeModal();
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModal();
-    if (e.key === 'Enter' && document.getElementById('modalOverlay').style.display === 'flex') confirmAddFund();
-    if ((e.key === 'r' || e.key === 'R') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doRefresh(); }
-  });
+function addFund() {
+    var code = document.getElementById("fund-code").value.trim();
+    var holdAmount = parseFloat(document.getElementById("hold-amount").value);
+    var navAmount = parseFloat(document.getElementById("nav-amount").value);
+    var nameInput = document.getElementById("search-input").value.trim().replace(/\s*\(\d+\)$/, "");
+    if (!code || !holdAmount || !navAmount) { showToast("请填写完整信息"); return; }
+    if (portfolio.filter(function(f) { return f.code === code; }).length > 0) { showToast("该基金已添加"); return; }
+    portfolio.push({ code: code, name: nameInput, holdAmount: holdAmount, navAmount: navAmount });
+    savePortfolio();
+    renderFunds();
+    hideAddPanel();
+    showToast("添加成功");
 }
 
-function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function removeFund(code) {
+    portfolio = portfolio.filter(function(f) { return f.code !== code; });
+    savePortfolio();
+    renderFunds();
+}
 
-<<<<<<< HEAD
-document.addEventListener('DOMContentLoaded', init);
-=======
-document.addEventListener('DOMContentLoaded', init);
->>>>>>> 35976c2 (﻿fix: BOM清理 + 网络安全配置 + 乱码修复)
+function showToast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(function() { t.classList.remove("show"); }, 2500);
+}
+
+document.addEventListener("DOMContentLoaded", init);
